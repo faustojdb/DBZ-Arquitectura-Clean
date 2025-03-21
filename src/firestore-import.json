@@ -1,0 +1,61 @@
+{
+  "items": {
+    "MAT001": {
+      "descripcion": "Hormigón H21",
+      "unidad": "m³",
+      "precio_unitario": 52000,
+      "categoria": "Materiales",
+      "subcategoria": "Hormigón",
+      "fecha_actualizacion": "2025-02-10"
+    }
+  },
+  "analisis": {
+    "AC001": {
+      "codigo": "AC001",
+      "nombre": "Base aislada H21",
+      "unidad": "m³",
+      "rendimiento": 1,
+      "fecha_actualizacion": "2025-02-10",
+      "insumos": {
+        "INS001": {
+          "item_id": "MAT001",
+          "cantidad": 1.05,
+          "unidad": "m³",
+          "coeficiente": 1,
+          "precio_unitario": 52000,
+          "subtotal": 54600
+        }
+      },
+      "costo_total": 54600
+    }
+  },
+  "presupuestos": {
+    "PRES2025001": {
+      "datos_generales": {
+        "fecha": "2025-02-10",
+        "comitente": "Familia Moreno",
+        "obra": "Proyecto casa 3 dormitorios en 2 pisos",
+        "tipo_encomienda": "Obra - Construcción"
+      },
+      "items": {
+        "IT001": {
+          "numero_item": "3.1.0",
+          "nombre": "Base aislada, Tronco Cónico - Cuantía 52 Kg/m3",
+          "unidad": "m³",
+          "cantidad": 6.40,
+          "precio_unitario": 148538.16,
+          "importe": 950644.23,
+          "incidencia": 2.51
+        }
+      },
+      "subtotales": {
+        "ST001": {
+          "nombre": "Estructura Resistente",
+          "importe": 950644.23,
+          "incidencia": 2.51
+        }
+      },
+      "total_general": 950644.23
+    }
+  }
+}

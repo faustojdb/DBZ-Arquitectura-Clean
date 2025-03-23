@@ -78,15 +78,23 @@ service cloud.firestore {
 
 3. Haz clic en "Publicar"
 
-## Paso 7: Inicializar la Base de Datos
+## Paso 7: Configurar Credenciales de Firebase (IMPORTANTE)
 
-Para inicializar la base de datos con datos de prueba, necesitarás Node.js y una cuenta de servicio de Firebase.
+Para inicializar la base de datos con datos de prueba, necesitarás generar un archivo de credenciales de servicio:
 
 1. En Firebase Console, ve a "Configuración del proyecto" > "Cuentas de servicio"
-2. Haz clic en "Generar nueva clave privada"
-3. Guarda el archivo JSON como `serviceAccountKey.json` en la raíz del proyecto
-4. Crea un archivo llamado `firestore-init.js` en la raíz del proyecto con el código proporcionado
-5. Ejecuta el script para inicializar tu base de datos:
+2. Selecciona "Firebase Admin SDK" 
+3. Haz clic en "Generar nueva clave privada"
+4. Guarda el archivo JSON como `serviceAccountKey.json` en la raíz del proyecto
+5. **¡IMPORTANTE!** Asegúrate de que este archivo esté incluido en `.gitignore` y **NUNCA** lo subas al repositorio
+
+```bash
+# Verifica que .gitignore contenga:
+serviceAccountKey.json
+```
+
+6. Crea un archivo llamado `firestore-init.js` en la raíz del proyecto con el código proporcionado
+7. Ejecuta el script para inicializar tu base de datos:
 
 ```bash
 node firestore-init.js

@@ -8,7 +8,8 @@ import {
   getDocs, 
   addDoc, 
   updateDoc, 
-  doc, 
+  doc,
+setDoc,  
   deleteDoc, 
   query, 
   orderBy, 
@@ -771,78 +772,126 @@ const PriceManagement = () => {
   }, []);
   
   // CRUD: Añadir material
-  const handleAddMaterial = async () => {
-    try {
-      // Validar campos requeridos
-      if (!newMaterial.descripcion || !newMaterial.unidad) {
-        setError("La descripción y unidad son campos obligatorios");
-        toast.error("La descripción y unidad son campos obligatorios");
-        return;
-      }
-      
-      setLoading(true);
-      
-      // Crear nuevo documento en Firestore
-      const materialsRef = collection(db, COLLECTION_NAME);
-      const docRef = await addDoc(materialsRef, {
-        ...newMaterial,
-        precio_unitario: parseFloat(newMaterial.precio_unitario) || 0,
-        fecha_actualizacion: serverTimestamp(),
-        activo: true
+  // Función para obtener el siguiente código secuencial
+const getNextSequentialCode = (items) => {
+  // Si no hay items, comenzamos con un valor predeterminado
+  if (!items || items.length === 0) {
+    return 'MAT-0001'; // Formato inicial
+  }
+  
+  try {
+    // Filtrar solo los códigos que siguen nuestro formato (ej: MAT-####)
+    const codeRegex = /^MAT-(\d+)$/;
+    const validCodes = items
+      .map(item => item.id)
+      .filter(id => codeRegex.test(id))
+      .map(id => {
+        const match = id.match(codeRegex);
+        return match ? parseInt(match[1], 10) : 0;
       });
+    
+    // Si no hay códigos válidos, comenzar desde el principio
+    if (validCodes.length === 0) {
+      return 'MAT-0001';
+    }
+    
+    // Encontrar el número más alto
+    const highestNumber = Math.max(...validCodes);
+    
+    // Incrementar y formatear con ceros a la izquierda
+    const nextNumber = highestNumber + 1;
+    const formattedNumber = nextNumber.toString().padStart(4, '0');
+    
+    return `MAT-${formattedNumber}`;
+  } catch (error) {
+    console.error("Error al generar código secuencial:", error);
+    // En caso de error, crear un código basado en timestamp como fallback
+    const timestamp = Date.now().toString().slice(-5);
+    return `MAT-${timestamp}`;
+  }
+};
+
+// Modificación para la función handleAddMaterial
+const handleAddMaterial = async () => {
+  try {
+    // Validar campos requeridos
+    if (!newMaterial.descripcion || !newMaterial.unidad) {
+      setError("La descripción y unidad son campos obligatorios");
+      toast.error("La descripción y unidad son campos obligatorios");
+      return;
+    }
+    
+    setLoading(true);
+    
+    // Generar el siguiente código secuencial
+    const nextCode = getNextSequentialCode(items);
+    
+    // Crear nuevo documento en Firestore CON ID ESPECÍFICO
+    const materialsRef = collection(db, COLLECTION_NAME);
+    const docRef = doc(materialsRef, nextCode); // Especificar el ID en lugar de dejarlo autogenerar
+    
+    // Añadir el documento con el ID personalizado
+    await setDoc(docRef, {
+      ...newMaterial,
+      precio_unitario: parseFloat(newMaterial.precio_unitario) || 0,
+      fecha_actualizacion: serverTimestamp(),
+      activo: true
+    });
+    
+    // Añadir el nuevo item al estado local
+    const newItem = {
+      id: nextCode, // Usar el código que generamos
+      ...newMaterial,
+      precio_unitario: parseFloat(newMaterial.precio_unitario) || 0,
+      fecha_actualizacion: new Date(),
+      activo: true
+    };
+    
+    // Actualizar estado
+    setItems(prevItems => [newItem, ...prevItems]);
+    setTotalCount(prev => prev + 1);
+    
+    // Actualizar caché
+    const cachedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (cachedData) {
+      const parsedCache = JSON.parse(cachedData);
+      parsedCache.items = [newItem, ...parsedCache.items];
+      parsedCache.totalCount += 1;
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedCache));
+    }
+    
+    // Actualizar categorías si es nueva
+    if (newMaterial.categoria && !categories.includes(newMaterial.categoria)) {
+      const newCategories = [...categories, newMaterial.categoria].sort();
+      setCategories(newCategories);
       
-      // Añadir el nuevo item al estado local
-      const newItem = {
-        id: docRef.id,
-        ...newMaterial,
-        precio_unitario: parseFloat(newMaterial.precio_unitario) || 0,
-        fecha_actualizacion: new Date(),
-        activo: true
-      };
-      
-      // Actualizar estado
-      setItems(prevItems => [newItem, ...prevItems]);
-      setTotalCount(prev => prev + 1);
-      
-      // Actualizar caché
-      const cachedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      // Actualizar categorías en caché
       if (cachedData) {
         const parsedCache = JSON.parse(cachedData);
-        parsedCache.items = [newItem, ...parsedCache.items];
-        parsedCache.totalCount += 1;
+        parsedCache.categories = newCategories.filter(cat => cat !== 'all');
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedCache));
       }
-      
-      // Actualizar categorías si es nueva
-      if (newMaterial.categoria && !categories.includes(newMaterial.categoria)) {
-        const newCategories = [...categories, newMaterial.categoria].sort();
-        setCategories(newCategories);
-        
-        // Actualizar categorías en caché
-        if (cachedData) {
-          const parsedCache = JSON.parse(cachedData);
-          parsedCache.categories = newCategories.filter(cat => cat !== 'all');
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedCache));
-        }
-      }
-      
-      // Resetear formulario
-      setNewMaterial({
-        descripcion: '',
-        categoria: '',
-        unidad: '',
-        precio_unitario: 0
-      });
-      
-      toast.success("Material añadido correctamente");
-    } catch (err) {
-      console.error("Error al añadir material:", err);
-      setError(`Error al añadir material: ${err.message}`);
-      toast.error(`Error al añadir material: ${err.message}`);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Resetear formulario
+    setNewMaterial({
+      descripcion: '',
+      categoria: '',
+      unidad: '',
+      precio_unitario: 0
+    });
+    
+    toast.success(`Material añadido correctamente con código: ${nextCode}`);
+  } catch (err) {
+    console.error("Error al añadir material:", err);
+    setError(`Error al añadir material: ${err.message}`);
+    toast.error(`Error al añadir material: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   // CRUD: Actualizar material
   const handleUpdateMaterial = async (id, updatedData) => {

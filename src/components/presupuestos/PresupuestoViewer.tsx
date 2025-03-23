@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '../../utils/formatters';
 import ExportToPDF from './components/ExportToPDF';
 // Importamos la herramienta de diagnóstico
 import PresupuestoDiagnostico from './utils/PresupuestoDiagnostico';
+import RUBROS from '../analysis/constants/rubros'; // Importar los 37 rubros
 
 const PresupuestoViewer = () => {
   const { presupuestoId } = useParams();
@@ -15,6 +16,79 @@ const PresupuestoViewer = () => {
   const presupuestoRef = useRef(null);
   const [mostrarDiagnostico, setMostrarDiagnostico] = useState(false);
   
+  // Función para obtener la categoría desde el índice mayor (igual que en PresupuestoEditor)
+  const getCategoriaFromIndiceMayor = (indiceMayor) => {
+    // Buscar el rubro con el ID que coincide con indiceMayor
+    const rubro = Object.values(RUBROS).find(r => r.id === indiceMayor);
+    return rubro ? rubro.nombre : `Categoría ${indiceMayor}`;
+  };
+  
+  // Función para deducir el índice mayor de un ítem
+  const getIndiceMayorFromItem = (item) => {
+  // El índice mayor original podría estar almacenado directamente en el ítem
+  if (item.categoria_original_id || item.indice_original) {
+    return item.categoria_original_id || parseInt(item.indice_original?.split('.')[0]);
+  }
+  
+  // Si hay analisis_id, buscar el análisis correspondiente
+  if (item.analisis_id) {
+    // Si tuviéramos acceso a la lista de análisis, podríamos buscar aquí
+  }
+  
+  // En el caso de presupuesto, el índice mayor original puede estar en una columna específica
+  // Por ejemplo, puede que se guarde en la estructura de Firebase
+  const indiceMayorPosible = parseInt(item.indice_mayor);
+  if (!isNaN(indiceMayorPosible)) {
+    return indiceMayorPosible;
+  }
+  
+  // Si no podemos encontrar el índice mayor original, 
+  // intentamos inferirlo desde otras propiedades
+  // Como último recurso, podemos usar la correspondencia entre índice y categoría
+  // que se ve en tus ejemplos
+  
+  // Por ejemplo, si la categoría es "ESTRUCTURA DE H°A°", el índice mayor sería 7
+  if (item.nombre?.includes("Columnas Estructurales") || 
+      item.nombre?.includes("Viga de fundacion") ||
+      (item.categoria && item.categoria.includes("ESTRUCTURA"))) {
+    return 7;
+  }
+  
+  // Para contrapisos
+  if (item.nombre?.includes("Contrapiso") || 
+      (item.categoria && item.categoria.includes("CONTRAPISO"))) {
+    return 10;
+  }
+  
+  // Para revestimientos
+  if (item.nombre?.includes("Revestimiento Porcelanato") || 
+      (item.categoria && item.categoria.includes("REVESTIMIENTO"))) {
+    return 12;
+  }
+  
+  // Para artefactos sanitarios
+  if (item.nombre?.includes("Pileta") || 
+      (item.categoria && item.categoria.includes("ARTEFACTOS"))) {
+    return 22;
+  }
+  
+  // Para pinturas
+  if (item.nombre?.includes("Pint.") || 
+      item.nombre?.includes("latex") ||
+      (item.categoria && item.categoria.includes("PINTURA"))) {
+    return 33;
+  }
+  
+  // Si todo lo demás falla, intentar con el número de ítem
+  if (item.numero_item) {
+    return parseInt(item.numero_item.split('.')[0]);
+  }
+  
+  // Valor predeterminado
+  return 1;
+};
+
+
   // Función para obtener el total general de manera confiable
   const getTotalGeneral = () => {
     if (!presupuesto) return 0;
@@ -63,84 +137,31 @@ const PresupuestoViewer = () => {
     return 0;
   };
   
-  // Organizar ítems por rubro
-  const organizarItemsPorRubro = () => {
-    if (!presupuesto) return [];
-    
-    const result = [];
-    const subtotales = presupuesto.subtotales || {};
-    const presupuestoItems = presupuesto.items || {};
-    
-    // Ordenar rubros por ID
-    const rubrosOrdenados = Object.entries(subtotales)
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => {
-        const numA = parseInt(a.id.replace('ST', '').replace(/^0+/, '') || '0');
-        const numB = parseInt(b.id.replace('ST', '').replace(/^0+/, '') || '0');
-        return numA - numB;
-      });
-    
-    // Procesar cada rubro y sus items
-    rubrosOrdenados.forEach(rubro => {
-      // Extraer el número de rubro
-      const rubroNumero = rubro.id.replace('ST', '').replace(/^0+/, '');
-      
-      // Agregar rubro principal (con índice correcto X.0.0)
-      result.push({
-        id: rubro.id,
-        esRubro: true,
-        indice: rubroNumero + '.0.0',
-        nombre: rubro.nombre || 'Sin nombre',
-        importe: rubro.importe || 0,
-        incidencia: rubro.incidencia || 0
-      });
-      
-      // Filtrar items por rubro
-      const itemsFiltrados = Object.entries(presupuestoItems)
-        .filter(([_, itemData]) => {
-          const itemPrefix = (itemData.numero_item || '').split('.')[0];
-          return itemPrefix === rubroNumero;
-        })
-        .map(([itemId, itemData]) => ({
-          id: itemId,
-          esRubro: false,
-          indice: itemData.numero_item || '',
-          nombre: itemData.nombre || '',
-          unidad: itemData.unidad || '',
-          cantidad: itemData.cantidad || 0,
-          precioUnitario: itemData.precio_unitario || 0,
-          importe: itemData.importe || 0,
-          incidencia: itemData.incidencia || 0,
-          abrev: itemData.abrev || ''
-        }))
-        .sort((a, b) => {
-          const subIndexA = parseFloat(a.indice.split('.')[1] || '0');
-          const subIndexB = parseFloat(b.indice.split('.')[1] || '0');
-          return subIndexA - subIndexB;
-        });
-      
-      result.push(...itemsFiltrados);
-    });
-    
-    return result;
-  };
-
-  // Función para formatear fecha correctamente (VERSIÓN MEJORADA)
+  // Función para formatear fecha correctamente (corregida para el problema del día)
   const formatearFecha = (fechaInput) => {
     if (!fechaInput) return '11 de Marzo de 2025';
     
     try {
       let fecha;
       
-      // Manejar diferentes formatos de fecha
+      // Manejar diferentes formatos de fecha evitando problemas de zona horaria
       if (typeof fechaInput === 'string') {
-        fecha = new Date(fechaInput);
+        // Extraer partes de la fecha directamente de la cadena
+        const [year, month, day] = fechaInput.split('T')[0].split('-').map(Number);
+        // Crear la fecha usando los componentes exactos
+        fecha = new Date(year, month - 1, day);
       } else if (fechaInput instanceof Date) {
-        fecha = fechaInput;
+        fecha = new Date(
+          fechaInput.getFullYear(), 
+          fechaInput.getMonth(), 
+          fechaInput.getDate()
+        );
       } else if (fechaInput.toDate && typeof fechaInput.toDate === 'function') {
-        fecha = fechaInput.toDate();
+        const d = fechaInput.toDate();
+        fecha = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       } else if (fechaInput.seconds) {
-        fecha = new Date(fechaInput.seconds * 1000);
+        const d = new Date(fechaInput.seconds * 1000);
+        fecha = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       } else {
         fecha = new Date();
       }
@@ -160,10 +181,89 @@ const PresupuestoViewer = () => {
       return '11 de Marzo de 2025';
     }
   };
-
+  
+  // Organizar ítems por rubro
+const organizarItemsPorRubro = () => {
+  if (!presupuesto) return [];
+  
+  const result = [];
+  const subtotales = presupuesto.subtotales || {};
+  const presupuestoItems = presupuesto.items || {};
+  
+  // Ordenar rubros por ID numérico
+  const rubrosOrdenados = Object.entries(subtotales)
+    .map(([id, data]) => ({ id, ...data }))
+    .sort((a, b) => {
+      const numA = parseInt(a.id.replace('ST', '').replace(/^0+/, '') || '0');
+      const numB = parseInt(b.id.replace('ST', '').replace(/^0+/, '') || '0');
+      return numA - numB;
+    });
+  
+  // Procesar cada rubro y sus items
+  rubrosOrdenados.forEach(rubro => {
+    // Extraer el número de rubro
+    const rubroNumero = rubro.id.replace('ST', '').replace(/^0+/, '');
+    
+    // Filtrar items por rubro
+    const itemsDelRubro = Object.entries(presupuestoItems)
+      .filter(([_, itemData]) => {
+        // Filtrar por el primer número del índice del presupuesto
+        const itemPrefix = (itemData.numero_item || '').split('.')[0];
+        return itemPrefix === rubroNumero;
+      })
+      .map(([itemId, itemData]) => ({
+        id: itemId,
+        ...itemData
+      }));
+    
+    // Asegurarse de que haya ítems en este rubro
+    if (itemsDelRubro.length === 0) return;
+    
+    // Obtener el primer ítem para determinar la categoría original
+    const primerItem = itemsDelRubro[0];
+    const indiceMayorOriginal = getIndiceMayorFromItem(primerItem);
+    const categoriaOriginal = getCategoriaFromIndiceMayor(indiceMayorOriginal);
+    
+    // Agregar rubro principal con la categoría original
+    result.push({
+      id: rubro.id,
+      esRubro: true,
+      indice: rubroNumero + '.0.0',
+      nombre: categoriaOriginal,  // Usar la categoría original
+      importe: rubro.importe || 0,
+      incidencia: rubro.incidencia || 0
+    });
+    
+    // Filtrar y ordenar ítems
+    const itemsFiltrados = itemsDelRubro
+      .map(itemData => ({
+        id: itemData.id,
+        esRubro: false,
+        indice: itemData.numero_item || '',
+        nombre: itemData.nombre || '',
+        unidad: itemData.unidad || '',
+        cantidad: itemData.cantidad || 0,
+        precioUnitario: itemData.precio_unitario || 0,
+        importe: itemData.importe || 0,
+        incidencia: itemData.incidencia || 0,
+        abrev: itemData.abrev || ''
+      }))
+      .sort((a, b) => {
+        // Ordenar por el segundo número del índice (x.Y.z)
+        const subIndexA = parseInt(a.indice.split('.')[1] || '0');
+        const subIndexB = parseInt(b.indice.split('.')[1] || '0');
+        return subIndexA - subIndexB;
+      });
+    
+    result.push(...itemsFiltrados);
+  });
+  
+  return result;
+};
+	
   if (loading) {
-    return <div className="p-8 text-center">Cargando...</div>;
-  }
+  return <div className="p-8 text-center">Cargando...</div>;
+}
   
   if (error || !presupuesto) {
     return (
@@ -220,7 +320,7 @@ const PresupuestoViewer = () => {
   const rubrosItems = organizarItemsPorRubro();
   
   return (
-    <div className="container mx-auto px-4 flex flex-col items-center print:px-0 print:py-0">
+    <div className="w-full max-w-10xl mx-auto px-4 flex flex-col items-center print:px-0 print:py-0">
       {/* Estilos CSS */}
       <style>
         {`
@@ -332,8 +432,7 @@ const PresupuestoViewer = () => {
           <ExportToPDF elementId="presupuesto-main" fileName={`Presupuesto_${presupuestoId}.pdf`} />
         </div>
       </div>
-      
-      {/* Documento de presupuesto */}
+	  {/* Documento de presupuesto */}
       <div 
         id="presupuesto-documento" 
         ref={presupuestoRef} 
@@ -368,153 +467,155 @@ const PresupuestoViewer = () => {
             </tr>
             <tr><td colSpan={8} className="p-2"></td></tr>
             
-            {/* Esta es la parte que se exportará a PDF */}
-            <tr id="presupuesto-main">
-              <td colSpan={8} style={{padding: 0, border: 'none'}}>
-                <table className="w-full border-collapse border border-gray-300" style={{margin: 0}}>
-                  <tbody>
-                    {/* Título Presupuesto y logo */}
-                    <tr>
-                      <td colSpan={6} className="dbz-title p-2" style={{fontSize: '28px'}}>PRESUPUESTO</td>
-                      <td colSpan={2} rowSpan={3} className="p-2 text-right">
-                        <img 
-                          src="/assets/logo-dbz.png" 
-                          alt="DBZ Arquitectura" 
-                          style={{height: '80px', float: 'right'}} 
-                          onError={(e) => {
-                            e.currentTarget.src = "/logo-dbz.png";
-                            e.currentTarget.onerror = null;
-                          }}
-                        />
-                      </td>
-                    </tr>
-                    <tr><td colSpan={6} className="p-2"></td></tr>
-                    <tr>
-                      <td className="p-2">{lugarFinal}</td>
-                      <td className="p-2">,</td>
-                      <td colSpan={5} className="p-2">{fechaFormateada}</td>
-                    </tr>
-                    
-                    {/* Datos iniciales */}
-                    <tr style={{backgroundColor: '#364C63'}}>
-                      <td colSpan={2} className="p-2" style={{color: '#F4F3EF'}}>COMITENTE:</td>
-                      <td colSpan={6} className="p-2" style={{color: '#F4F3EF'}}>{presupuesto.comitente}</td>
-                    </tr>
-                    <tr style={{backgroundColor: '#364C63'}}>
-                      <td colSpan={2} className="p-2" style={{color: '#F4F3EF'}}>OBRA:</td>
-                      <td colSpan={6} className="p-2" style={{color: '#F4F3EF'}}>{presupuesto.obra}</td>
-                    </tr>
-                    <tr style={{backgroundColor: '#364C63'}}>
-                      <td colSpan={2} className="p-2" style={{color: '#F4F3EF'}}>TIPO DE ENCOMIENDA:</td>
-                      <td colSpan={6} className="p-2" style={{color: '#F4F3EF'}}>{presupuesto.tipoEncomenda || 'Obra - Construcción'}</td>
-                    </tr>
-                    <tr><td colSpan={8} className="p-2"></td></tr>
-                    
-                    {/* Tabla de ítems */}
-                    <tr style={{backgroundColor: '#F3B340'}}>
-                      <th className="p-2 border border-gray-300 text-left">ITEM</th>
-                      <th className="p-2 border border-gray-300 text-left">Abrev</th>
-                      <th className="p-2 border border-gray-300 text-left">NOMBRE / INSUMO</th>
-                      <th className="p-2 border border-gray-300 text-left">UNIDAD</th>
-                      <th className="p-2 border border-gray-300 text-left">CANTIDAD</th>
-                      <th className="p-2 border border-gray-300 text-left">PRECIO UNITARIO</th>
-                      <th className="p-2 border border-gray-300 text-left" style={{width: '120px'}}>IMPORTE</th>
-                      <th className="p-2 border border-gray-300 text-left" style={{width: '90px'}}>INCID. (%)</th>
-                    </tr>
-                    <tr><td colSpan={8} className="p-2"></td></tr>
-                    
-                    {/* Datos de ítems y rubros */}
-                    {rubrosItems.map((item, index) => (
-                      <tr 
-                        key={`${item.id}-${index}`} 
-                        style={{
-                          backgroundColor: item.esRubro ? '#F4F3EF' : '#FFFFFF',
-                          fontWeight: item.esRubro ? 'bold' : 'normal'
-                        }}
-                      >
-                        <td className="p-2 border border-gray-300">{item.indice}</td>
-                        <td className="p-2 border border-gray-300">{!item.esRubro ? item.abrev : ""}</td>
-                        <td className="p-2 border border-gray-300">{item.nombre}</td>
-                        <td className="p-2 border border-gray-300 text-center">{!item.esRubro ? item.unidad : ""}</td>
-                        <td className="p-2 border border-gray-300 text-right">
-                          {!item.esRubro ? item.cantidad.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ""}
-                        </td>
-                        <td className="p-2 border border-gray-300 text-right">
-                          {!item.esRubro ? `${item.precioUnitario.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ""}
-                        </td>
-                        <td className="p-2 border border-gray-300 text-right">
-                          {`$ ${item.importe.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                        </td>
-                        <td className="p-2 border border-gray-300 text-right">
-                          {item.esRubro && item.incidencia > 0 
-                            ? `${parseFloat(item.incidencia).toFixed(2)}%`
-                            : ""
-                          }
-                        </td>
-                      </tr>
-                    ))}
-                    
-                    {/* Espacio azul entre ítems y totales */}
-                    <tr><td colSpan={8} style={{backgroundColor: '#364C63', height: '60px'}}></td></tr>
-                    <tr><td colSpan={8}></td></tr>
-                    
-                    {/* Totales - CORREGIDO: Muestra valores calculados correctamente */}
-                    <tr style={{backgroundColor: '#F3B340'}}>
-                      <td colSpan={5} className="p-2 border border-gray-300"></td>
-                      <td className="p-2 border border-gray-300 text-right"><strong>Subtotal:</strong></td>
-                      <td className="p-2 border border-gray-300 text-right">$</td>
-                      <td className="p-2 border border-gray-300 text-right">
-                        {total.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </td>
-                    </tr>
-                    <tr style={{backgroundColor: '#F3B340'}}>
-                      <td colSpan={5} className="p-2 border border-gray-300"></td>
-                      <td className="p-2 border border-gray-300 text-right"><strong>Beneficios ({beneficioExplicito}%)</strong></td>
-                      <td className="p-2 border border-gray-300 text-right">$</td>
-                      <td className="p-2 border border-gray-300 text-right">
-                        {beneficioAmount.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </td>
-                    </tr>
-                    <tr style={{backgroundColor: '#F3B340'}}>
-                      <td colSpan={5} className="p-2 border border-gray-300"></td>
-                      <td className="p-2 border border-gray-300 text-right"><strong>Total Ejecucion:</strong></td>
-                      <td className="p-2 border border-gray-300 text-right">$</td>
-                      <td className="p-2 border border-gray-300 text-right font-bold">
-                        {totalConBeneficio.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                      </td>
-                    </tr>
-                    <tr><td colSpan={8}></td></tr>
-                    <tr><td colSpan={8}></td></tr>
-                    
-                    {/* Notas y firma */}
-                    <tr>
-                      <td colSpan={2}></td>
-                      <td colSpan={4} className="p-2 border border-gray-300">
-                        <div>
-                          <p>Notas:</p>
-                          <textarea 
-                            className="w-full p-2 border border-gray-300 print:border-none"
-                            style={{minHeight: '120px', width: '100%'}}
-                            value={notasTexto}
-                            onChange={(e) => setNotasTexto(e.target.value)}
-                          />
-                        </div>
-                      </td>
-                      <td colSpan={2} className="p-2 border border-gray-300 text-right align-top">
-                        <img 
-                          src="/assets/firma.png" 
-                          alt="Firma" 
-                          style={{maxWidth: '100%', float: 'right'}} 
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
+{/* Esta es la parte que se exportará a PDF */}
+<tr id="presupuesto-main">
+  <td colSpan={8} style={{padding: 0, border: 'none'}}>
+    <table className="w-full border-collapse border border-gray-300" style={{margin: 0}}>
+      <tbody>
+        {/* Título Presupuesto y logo */}
+        <tr>
+          <td colSpan={6} className="dbz-title p-2" style={{fontSize: '28px'}}>PRESUPUESTO</td>
+          <td colSpan={2} rowSpan={3} className="p-2 text-right">
+            <img 
+              src="/assets/logo-dbz.png" 
+              alt="DBZ Arquitectura" 
+              style={{height: '80px', float: 'right'}} 
+              onError={(e) => {
+                e.currentTarget.src = "/logo-dbz.png";
+                e.currentTarget.onerror = null;
+              }}
+            />
+          </td>
+        </tr>
+        <tr><td colSpan={6} className="p-2"></td></tr>
+        <tr>
+          <td className="p-2">{lugarFinal}</td>
+          <td colSpan={5} className="p-2">{fechaFormateada}</td>
+        </tr>
+
+        {/* Datos iniciales */}
+        <tr style={{backgroundColor: '#364C63'}}>
+          <td colSpan={8} className="p-2" style={{color: '#F4F3EF'}}>
+            COMITENTE:  {presupuesto.comitente}
+          </td>
+        </tr>
+        <tr style={{backgroundColor: '#364C63'}}>
+          <td colSpan={8} className="p-2" style={{color: '#F4F3EF'}}>
+            OBRA:  {presupuesto.obra}
+          </td>
+        </tr>
+        <tr style={{backgroundColor: '#364C63'}}>
+          <td colSpan={8} className="p-2" style={{color: '#F4F3EF'}}>
+            TIPO DE ENCOMIENDA:  {presupuesto.tipoEncomenda || 'Obra - Construcción'}
+          </td>
+        </tr>
+        <tr><td colSpan={8} className="p-2"></td></tr>
+
+        {/* Tabla de ítems */}
+        <tr style={{backgroundColor: '#F3B340'}}>
+          <th className="p-2 border border-gray-300 text-left" style={{width: '60px'}}>ITEM</th>
+          <th className="p-2 border border-gray-300 text-left" style={{width: '60px'}}>Abrev</th>
+          <th className="p-2 border border-gray-300 text-left" style={{width: '250px'}}>NOMBRE / INSUMO</th>
+          <th className="p-2 border border-gray-300 text-center" style={{width: '80px'}}>UNIDAD</th>
+          <th className="p-2 border border-gray-300 text-right" style={{width: '90px'}}>CANTIDAD</th>
+          <th className="p-2 border border-gray-300 text-left">PRECIO UNITARIO</th>
+          <th className="p-2 border border-gray-300 text-left" style={{width: '120px'}}>IMPORTE</th>
+          <th className="p-2 border border-gray-300 text-left" style={{width: '90px'}}>INCID. (%)</th>
+        </tr>
+        <tr><td colSpan={8} className="p-2"></td></tr>
+
+        {/* Datos de ítems y rubros */}
+        {rubrosItems.map((item, index) => (
+          <tr 
+            key={`${item.id}-${index}`} 
+            style={{
+              backgroundColor: item.esRubro ? '#F4F3EF' : '#FFFFFF',
+              fontWeight: item.esRubro ? 'bold' : 'normal'
+            }}
+          >
+            <td className="p-2 border border-gray-300">{item.indice}</td>
+            <td className="p-2 border border-gray-300">{!item.esRubro ? item.abrev : ""}</td>
+            <td className="p-2 border border-gray-300">{item.nombre}</td>
+            <td className="p-2 border border-gray-300 text-center">{!item.esRubro ? item.unidad : ""}</td>
+            <td className="p-2 border border-gray-300 text-right">
+              {!item.esRubro ? item.cantidad.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : ""}
+            </td>
+            <td className="p-2 border border-gray-300 text-right">
+              {!item.esRubro ? `${item.precioUnitario.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : ""}
+            </td>
+            <td className="p-2 border border-gray-300 text-right">
+              {`$ ${item.importe.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+            </td>
+            <td className="p-2 border border-gray-300 text-right">
+              {item.esRubro && item.incidencia > 0 
+                ? `${parseFloat(item.incidencia).toFixed(2)}%`
+                : ""
+              }
+            </td>
+          </tr>
+        ))}
+
+        {/* Espacio azul entre ítems y totales */}
+        <tr><td colSpan={8} style={{backgroundColor: '#364C63', height: '60px'}}></td></tr>
+        <tr><td colSpan={8}></td></tr>
+
+        {/* Totales */}
+        <tr style={{backgroundColor: '#F3B340'}}>
+          <td colSpan={6} className="p-2 border border-gray-300 text-right">
+            <strong>Subtotal:</strong>
+          </td>
+          <td colSpan={2} className="p-2 border border-gray-300 text-right">
+            ${total.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </td>
+        </tr>
+        <tr style={{backgroundColor: '#F3B340'}}>
+          <td colSpan={6} className="p-2 border border-gray-300 text-right">
+            <strong>Beneficios ({beneficioExplicito}%):</strong>
+          </td>
+          <td colSpan={2} className="p-2 border border-gray-300 text-right">
+            ${beneficioAmount.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </td>
+        </tr>
+        <tr style={{backgroundColor: '#F3B340'}}>
+          <td colSpan={6} className="p-2 border border-gray-300 text-right">
+            <strong>Total Ejecución:</strong>
+          </td>
+          <td colSpan={2} className="p-2 border border-gray-300 text-right font-bold">
+            ${totalConBeneficio.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+          </td>
+        </tr>
+        <tr><td colSpan={8}></td></tr>
+        <tr><td colSpan={8}></td></tr>
+
+        {/* Notas y firma */}
+        <tr>
+          <td colSpan={2}></td>
+          <td colSpan={4} className="p-2 border border-gray-300">
+            <div>
+              <p>Notas:</p>
+              <textarea 
+                className="w-full p-2 border border-gray-300 print:border-none"
+                style={{minHeight: '120px', width: '100%'}}
+                value={notasTexto}
+                onChange={(e) => setNotasTexto(e.target.value)}
+              />
+            </div>
+          </td>
+          <td colSpan={2} className="p-2 border border-gray-300 text-right align-top">
+            <img 
+              src="/assets/firma.png" 
+              alt="Firma" 
+              style={{maxWidth: '100%', float: 'right'}} 
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+              }}
+            />
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </td>
+</tr>
           </tbody>
         </table>
       </div>

@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect } from 'react';
-import 'react-toastify/dist/ReactToastify.css';
+import './styles/toastify.css';
 import { ToastContainer } from 'react-toastify';
 import { 
   BrowserRouter as Router, 
@@ -75,7 +75,7 @@ const Navigation = () => {
 
   return (
     <nav className="bg-white shadow mb-6">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-10xl mx-auto px-4">
         <div className="flex justify-between items-center h-20">
           <div className="text-xl font-semibold" style={{ 
             color: styles.colors.text,
@@ -185,7 +185,7 @@ function App() {
           <Route path="/*" element={
             <>
               <Navigation />
-              <main className="max-w-6xl mx-auto px-4">
+              <main className="max-w-10xl mx-auto px-4">
                 <Routes>
                   {/* Ruta principal */}
                   <Route path="/" element={<PriceManagement />} />

@@ -14,6 +14,7 @@ import {
   where 
 } from 'firebase/firestore';
 import { db } from '@/firebase/config';
+import { toast } from 'react-toastify';
 
 // Constantes
 const ITEMS_PER_PAGE = 100;
@@ -46,7 +47,7 @@ const useMaterialsData = () => {
     precio_unitario: 0
   });
 
-  // Función para ordenar - DEFINIDA ANTES DE SU USO
+  // Función para ordenar
   const handleSort = useCallback((key) => {
     let direction = 'asc';
     
@@ -61,93 +62,31 @@ const useMaterialsData = () => {
   }, [sortConfig]); // Incluye sortConfig en las dependencias
 
   // Función para cargar items desde Firestore
- const loadAllMaterials = async () => {
-  if (loading) return;
-  
-  try {
-    setLoading(true);
-    setError(null);
+  const loadItems = useCallback(async (forceRefresh = false) => {
+    if (loading) return;
     
-    const materialsRef = collection(db, COLLECTION_NAME);
-    
-    // Importante: Esto podría ser intensivo si hay miles de documentos
-    const querySnapshot = await getDocs(query(materialsRef));
-    
-    const allItems = [];
-    const uniqueCategories = new Set();
-    
-    querySnapshot.forEach((doc) => {
-      const item = { id: doc.id, ...doc.data() };
-      allItems.push(item);
+    try {
+      setLoading(true);
+      setError(null);
       
-      if (item.categoria) {
-        uniqueCategories.add(item.categoria);
-      } else {
-        uniqueCategories.add('Sin categoría');
-      }
-    });
-    
-    // Ordenar alfabéticamente
-    allItems.sort((a, b) => {
-      if (sortConfig.key === 'id') {
-        return a.id.localeCompare(b.id) * (sortConfig.direction === 'asc' ? 1 : -1);
-      }
-      // Otras ordenaciones...
-      return 0;
-    });
-    
-    // Actualizar estado
-    setItems(allItems);
-    setCategories(['all', ...Array.from(uniqueCategories).sort()]);
-    setTotalCount(allItems.length);
-    setHasMore(false); // Ya no hay más que cargar
-    
-    // Actualizar caché
-    const cacheData = {
-      items: allItems,
-      timestamp: Date.now(),
-      categories: Array.from(uniqueCategories).sort(),
-      totalCount: allItems.length
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cacheData));
-    
-    console.log(`Cargados todos los ${allItems.length} materiales.`);
-    toast.success(`¡Cargados todos los ${allItems.length} materiales!`);
-    
-    return true;
-  } catch (err) {
-    console.error("Error al cargar todos los materiales:", err);
-    setError(`Error: ${err.message}`);
-    return false;
-  } finally {
-    setLoading(false);
-  }
-};
-	  const loadAllMaterials = async () => {
-  if (loading) return;
-  
-  try {
-    setLoading(true);
-    setError(null);
-    
-    const materialsRef = collection(db, COLLECTION_NAME);
-    
-    // Importante: Esto podría ser intensivo si hay miles de documentos
-    const querySnapshot = await getDocs(query(materialsRef));
-    
-    const allItems = [];
-    const uniqueCategories = new Set();
-    
-    querySnapshot.forEach((doc) => {
-      const item = { id: doc.id, ...doc.data() };
-      allItems.push(item);
+      // Verificar si hay datos en caché
+      const cachedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const cacheExpired = !cachedData || 
+        (JSON.parse(cachedData).timestamp + CACHE_TIMEOUT < Date.now());
       
-      if (item.categoria) {
-        uniqueCategories.add(item.categoria);
-      } else {
-        uniqueCategories.add('Sin categoría');
+      if (cachedData && !cacheExpired && !forceRefresh) {
+        // Usar datos de caché
+        console.log('Usando datos de caché');
+        const parsedCache = JSON.parse(cachedData);
+        
+        setItems(parsedCache.items);
+        setTotalCount(parsedCache.totalCount);
+        setCategories(['all', ...parsedCache.categories]);
+        setHasMore(parsedCache.items.length < parsedCache.totalCount);
+        setInitialLoading(false);
+        setCurrentPage(1);
+        return;
       }
-    });
       
       // Si no hay caché o se solicita actualización, cargar de Firebase
       console.log('Cargando desde Firebase');
@@ -209,7 +148,71 @@ const useMaterialsData = () => {
       setInitialLoading(false);
       setLoading(false);
     }
-  }, [sortConfig]);
+  }, [sortConfig, loading]);
+
+  // Función para cargar todos los materiales
+  const loadAllMaterials = async () => {
+    if (loading) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const materialsRef = collection(db, COLLECTION_NAME);
+      
+      // Importante: Esto podría ser intensivo si hay miles de documentos
+      const querySnapshot = await getDocs(query(materialsRef));
+      
+      const allItems = [];
+      const uniqueCategories = new Set();
+      
+      querySnapshot.forEach((doc) => {
+        const item = { id: doc.id, ...doc.data() };
+        allItems.push(item);
+        
+        if (item.categoria) {
+          uniqueCategories.add(item.categoria);
+        } else {
+          uniqueCategories.add('Sin categoría');
+        }
+      });
+      
+      // Ordenar alfabéticamente
+      allItems.sort((a, b) => {
+        if (sortConfig.key === 'id') {
+          return a.id.localeCompare(b.id) * (sortConfig.direction === 'asc' ? 1 : -1);
+        }
+        // Otras ordenaciones...
+        return 0;
+      });
+      
+      // Actualizar estado
+      setItems(allItems);
+      setCategories(['all', ...Array.from(uniqueCategories).sort()]);
+      setTotalCount(allItems.length);
+      setHasMore(false); // Ya no hay más que cargar
+      
+      // Actualizar caché
+      const cacheData = {
+        items: allItems,
+        timestamp: Date.now(),
+        categories: Array.from(uniqueCategories).sort(),
+        totalCount: allItems.length
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cacheData));
+      
+      console.log(`Cargados todos los ${allItems.length} materiales.`);
+      toast.success(`¡Cargados todos los ${allItems.length} materiales!`);
+      
+      return true;
+    } catch (err) {
+      console.error("Error al cargar todos los materiales:", err);
+      setError(`Error: ${err.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Cargar más items (paginación)
   const loadMoreItems = async () => {
@@ -277,68 +280,69 @@ const useMaterialsData = () => {
   };
 
   // Implementar búsqueda y filtrado
- useEffect(() => {
-  const fetchMaterials = async () => {
-    try {
-      const materialsRef = collection(db, 'items');
-      // Eliminar cualquier filtro que limite los resultados
-      const q = query(materialsRef);
-      const querySnapshot = await getDocs(q);
-      
-      const materialsList = [];
-      const uniqueCategories = new Set();
-      
-      console.log(`Total documentos encontrados: ${querySnapshot.size}`);
-      
-      querySnapshot.forEach((doc) => {
-        const material = {
-          id: doc.id,
-          ...doc.data()
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        const materialsRef = collection(db, 'items');
+        // Eliminar cualquier filtro que limite los resultados
+        const q = query(materialsRef);
+        const querySnapshot = await getDocs(q);
+        
+        const materialsList = [];
+        const uniqueCategories = new Set();
+        
+        console.log(`Total documentos encontrados: ${querySnapshot.size}`);
+        
+        querySnapshot.forEach((doc) => {
+          const material = {
+            id: doc.id,
+            ...doc.data()
+          };
+          
+          materialsList.push(material);
+          
+          // Guardar cada categoría única
+          if (material.categoria) {
+            uniqueCategories.add(material.categoria);
+          } else {
+            // Para materiales sin categoría asignada
+            uniqueCategories.add('Sin categoría');
+          }
+        });
+        
+        console.log(`Total materiales procesados: ${materialsList.length}`);
+        console.log(`Categorías encontradas: ${Array.from(uniqueCategories).join(', ')}`);
+        
+        // Convertir Set a Array y ordenar alfabéticamente
+        const categoriesArray = Array.from(uniqueCategories).sort();
+        
+        // Actualizar estado con todas las categorías encontradas
+        setCategories(['all', ...categoriesArray]);
+        
+        // Guardar en caché
+        const cacheData = {
+          items: materialsList,
+          timestamp: Date.now(),
+          categories: categoriesArray,
+          totalCount: querySnapshot.size
         };
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cacheData));
         
-        materialsList.push(material);
+        // Actualizar el estado
+        setItems(materialsList);
+        setTotalCount(querySnapshot.size);
         
-        // Guardar cada categoría única
-        if (material.categoria) {
-          uniqueCategories.add(material.categoria);
-        } else {
-          // Para materiales sin categoría asignada
-          uniqueCategories.add('Sin categoría');
-        }
-      });
-      
-      console.log(`Total materiales procesados: ${materialsList.length}`);
-      console.log(`Categorías encontradas: ${Array.from(uniqueCategories).join(', ')}`);
-      
-      // Convertir Set a Array y ordenar alfabéticamente
-      const categoriesArray = Array.from(uniqueCategories).sort();
-      
-      // Actualizar estado con todas las categorías encontradas
-      setCategories(['all', ...categoriesArray]);
-      
-      // Guardar en caché
-      const cacheData = {
-        items: materialsList,
-        timestamp: Date.now(),
-        categories: categoriesArray,
-        totalCount: querySnapshot.size
-      };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cacheData));
-      
-      // Actualizar el estado
-      setItems(materialsList);
-      setTotalCount(querySnapshot.size);
-      
-    } catch (err) {
-      console.error("Error al cargar materiales:", err);
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (err) {
+        console.error("Error al cargar materiales:", err);
+        setError(`Error: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchMaterials();
-}, []);
+    fetchMaterials();
+  }, []);
+
   // Cargar datos iniciales
   useEffect(() => {
     loadItems();
@@ -526,13 +530,13 @@ const useMaterialsData = () => {
       return "-";
     }
   };
-  const handleForceRefresh = () => {
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
-  setLoading(true);
-  loadItems(true); // Cargar directamente desde Firestore
-  toast.info("Forzando actualización completa de datos...");
-};
 
+  const handleForceRefresh = () => {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setLoading(true);
+    loadItems(true); // Cargar directamente desde Firestore
+    toast.info("Forzando actualización completa de datos...");
+  };
   
   return {
     items,
@@ -562,7 +566,9 @@ const useMaterialsData = () => {
     loadItems,
     loadMoreItems,
     cleanLocalStorage,
-    formatDate
+    formatDate,
+    handleForceRefresh,
+    loadAllMaterials
   };
 };
 

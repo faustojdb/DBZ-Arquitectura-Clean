@@ -11,7 +11,8 @@ import {
   deleteDoc,
   query,
   orderBy,
-  where
+  where,
+  setDoc  // Añadir esta importación
 } from 'firebase/firestore';
 
 /**
@@ -150,35 +151,50 @@ const usePresupuesto = (presupuestoId = null) => {
   /**
    * Crea un nuevo presupuesto en Firestore
    */
-  const createPresupuesto = useCallback(async (data) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Referencia a la colección
-      const colRef = collection(db, 'presupuestos');
-      
-      // Asegurarse de que lugar esté presente
-      if (data.datos_generales && !data.datos_generales.lugar) {
-        data.datos_generales.lugar = 'Lugar';
-      }
-      
-      // Añadir documento
-      const docRef = await addDoc(colRef, data);
-      console.log("Presupuesto creado con ID:", docRef.id);
-      
-      // Refrescar lista
-      await fetchPresupuestos();
-      
-      return docRef.id;
-    } catch (err) {
-      console.error("Error al crear presupuesto:", err);
-      setError(`Error al crear presupuesto: ${err.message}`);
-      throw err;
-    } finally {
-      setLoading(false);
+  /**
+ * Crea un nuevo presupuesto en Firestore con ID personalizado
+ */
+const createPresupuesto = useCallback(async (data) => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Obtener lista de presupuestos para generar ID secuencial
+    const allPresupuestos = await fetchPresupuestos();
+    
+    // Generar ID tipo PRES0001
+    const maxId = allPresupuestos
+      .filter(p => p.id.startsWith('PRES'))
+      .map(p => parseInt(p.id.substring(4), 10) || 0)
+      .reduce((max, num) => num > max ? num : max, 0);
+    
+    const newId = `PRES${(maxId + 1).toString().padStart(4, '0')}`;
+    
+    // Referencia al documento con ID personalizado
+    const docRef = doc(db, 'presupuestos', newId);
+    
+    // Asegurarse de que lugar esté presente
+    if (data.datos_generales && !data.datos_generales.lugar) {
+      data.datos_generales.lugar = 'Lugar';
     }
-  }, [fetchPresupuestos]);
+    
+    // Añadir documento con ID personalizado
+    await setDoc(docRef, data);
+    console.log("Presupuesto creado con ID:", newId);
+    
+    // Refrescar lista
+    await fetchPresupuestos();
+    
+    return newId;
+  } catch (err) {
+    console.error("Error al crear presupuesto:", err);
+    setError(`Error al crear presupuesto: ${err.message}`);
+    throw err;
+  } finally {
+    setLoading(false);
+  }
+}, [fetchPresupuestos]);
+
 
   /**
    * Actualiza un presupuesto existente en Firestore

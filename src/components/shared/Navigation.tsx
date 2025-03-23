@@ -51,7 +51,7 @@ const Navigation: React.FC<NavigationProps> = ({ styles }) => {
 
   return (
     <nav className="bg-white shadow mb-6">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-screen-2xl mx-auto px-4">  /* 2xl = 1536px */
         <div className="flex justify-between items-center h-20">
           <div className="text-xl font-semibold" style={{ 
             color: styles.colors.text,

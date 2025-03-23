@@ -1,0 +1,39 @@
+graph TD
+    subgraph "Estructura de Archivos"
+        root["proyecto-ac/"] --> public
+        root --> src
+        root --> config_files["Archivos de configuración (.gitignore, firebase.json, etc.)"]
+        
+        public --> assets["assets/ (logo-dbz.png, firma.png)"]
+        public --> index_html["index.html"]
+        
+        src --> components
+        src --> firebase["firebase/ (Configuración)"]
+        src --> hooks["hooks/ (Custom hooks)"]
+        src --> styles["styles/ (CSS global)"]
+        src --> types["types/ (TypeScript interfaces)"]
+        src --> utils["utils/ (Utilidades)"]
+        src --> app["App.tsx (Componente principal)"]
+        src --> main["main.tsx (Punto de entrada)"]
+        
+        components --> prices["prices/ (Gestión de precios)"]
+        components --> analysis["analysis/ (Análisis de costos)"]
+        components --> presupuestos["presupuestos/ (Gestión de presupuestos)"]
+        components --> shared["shared/ (Componentes comunes)"]
+        
+        prices --> price_mgmt["PriceManagement.tsx (Principal)"]
+        prices --> materials_data["useMaterialsData.ts (Hook)"]
+        prices --> materials_styles["materialsStyles.js (Estilos)"]
+        
+        analysis --> analysis_components["components/ (Componentes)"]
+        analysis --> analysis_constants["constants/ (Constantes)"]
+        analysis --> analysis_utils["utils/ (Utilidades)"]
+        analysis --> cost_analysis["CostAnalysis.tsx (Principal)"]
+        
+        presupuestos --> presupuesto_components["components/ (Componentes)"]
+        presupuestos --> presupuesto_utils["utils/ (Utilidades)"]
+        presupuestos --> presupuesto_list["PresupuestoList.tsx"]
+        presupuestos --> presupuesto_editor["PresupuestoEditor.tsx"]
+        presupuestos --> presupuesto_viewer["PresupuestoViewer.tsx"]
+        presupuestos --> presupuesto_routes["PresupuestoRoutes.tsx"]
+    end

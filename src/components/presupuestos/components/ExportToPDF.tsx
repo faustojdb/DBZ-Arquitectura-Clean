@@ -1,118 +1,111 @@
-// src/components/presupuestos/components/ExportToPDF.tsx
+// src/components/presupuestos/components/ExportToPDF.jsx
 import React from 'react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
-interface ExportToPDFProps {
-  elementId: string;
-  fileName?: string;
-}
+const ExportToPDF = ({ elementId, fileName = 'documento.pdf' }) => {
+  // A4 dimensions in mm: 210 x 297
+  const pageWidth = 210;
+  const pageHeight = 297;
+  
+  // Margin of 2.5cm = 25mm
+  const margin = 25;
+  const contentWidth = pageWidth - (margin * 2);
 
-/**
- * Componente para exportar un elemento HTML a PDF
- * Nota: Requiere instalación de jspdf y html2canvas:
- * npm install jspdf html2canvas --save
- */
-const ExportToPDF: React.FC<ExportToPDFProps> = ({ 
-  elementId, 
-  fileName = 'presupuesto.pdf' 
-}) => {
   const handleExport = async () => {
     try {
-      // Importar dinámicamente las librerías (para reducir tamaño inicial del bundle)
-      const { default: jsPDF } = await import('jspdf');
-      const { default: html2canvas } = await import('html2canvas');
-      
+      // Obtener el elemento a exportar
       const element = document.getElementById(elementId);
-      
       if (!element) {
-        alert('No se encontró el elemento a exportar');
+        alert('Elemento no encontrado');
         return;
       }
       
-      // Indicador de carga
-      const loadingDiv = document.createElement('div');
-      loadingDiv.className = 'fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50 z-50';
-      loadingDiv.innerHTML = `
-        <div class="bg-white p-5 rounded-lg shadow-lg">
-          <div class="w-10 h-10 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin mx-auto"></div>
-          <p class="mt-3 text-center">Generando PDF...</p>
-        </div>
-      `;
-      document.body.appendChild(loadingDiv);
+      // Crear un clon del elemento para aplicar estilos específicos para PDF
+      const clonedElement = element.cloneNode(true);
+      document.body.appendChild(clonedElement);
+      clonedElement.style.position = 'absolute';
+      clonedElement.style.left = '-9999px';
+      clonedElement.style.top = '-9999px';
+      clonedElement.style.width = `${pageWidth * 3.78}px`; // Factor de conversión aproximado mm a px
       
-      try {
-        // Crear el canvas a partir del elemento
-        const canvas = await html2canvas(element, {
-          scale: 2, // Mayor calidad
-          useCORS: true, // Permitir imágenes externas
-          logging: false, // Desactivar logs
-          allowTaint: false,
-          backgroundColor: '#ffffff'
-        });
+      // Ajustar tamaños de fuente en el clon para mejor legibilidad
+      const allTextElements = clonedElement.querySelectorAll('td, th, p, span, div');
+      allTextElements.forEach(el => {
+        el.style.fontSize = '14px'; // Tamaño base para la mayoría del texto
         
-        // Obtener datos de imagen del canvas
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        
-        // Crear PDF en formato A4
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
-        // Calcular proporciones para mantener aspecto
-        const imgWidth = 210; // A4 ancho
-        const pageHeight = 297; // A4 alto
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
-        
-        // Añadir primera página
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        
-        // Añadir páginas adicionales si es necesario
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+        // Si es un encabezado, usar un tamaño mayor
+        if (el.tagName === 'TH' || el.style.fontWeight === 'bold' || 
+            el.classList.contains('dbz-title') || el.classList.contains('arquitectura-title')) {
+          el.style.fontSize = '16px';
         }
-        
-        // Guardar el PDF
-        pdf.save(fileName);
-      } finally {
-        // Eliminar indicador de carga
-        document.body.removeChild(loadingDiv);
+      });
+      
+      // Ajustar encabezados específicos
+      const mainTitles = clonedElement.querySelectorAll('.dbz-title');
+      mainTitles.forEach(el => {
+        el.style.fontSize = '24px';
+      });
+      
+      // Configuraciones mejoradas para html2canvas
+      const canvas = await html2canvas(clonedElement, {
+        scale: 2, // Escala más alta para mejor calidad
+        useCORS: true, // Permitir imágenes de otros dominios
+        logging: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: clonedElement.offsetWidth,
+        height: clonedElement.offsetHeight
+      });
+      
+      // Limpiar el clon después de la captura
+      document.body.removeChild(clonedElement);
+      
+      // Crear nuevo documento PDF orientación vertical (A4)
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Calcular la relación de aspecto para mantenerla al escalar
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const imgWidth = contentWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      // Para manejar múltiples páginas
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // Primera página
+      pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - 2 * margin);
+      
+      // Añadir páginas adicionales si es necesario
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, position + margin, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - 2 * margin);
       }
+      
+      // Guardar el archivo PDF
+      pdf.save(fileName);
+      
+      console.log(`PDF exportado correctamente: ${fileName}`);
     } catch (error) {
-      console.error('Error al exportar a PDF:', error);
-      alert('Ocurrió un error al generar el PDF. Verifique la consola para más detalles.');
+      console.error('Error al exportar PDF:', error);
+      alert('Error al exportar PDF. Consulta la consola para más detalles.');
     }
   };
-  
+
   return (
     <button
       onClick={handleExport}
-      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
       title="Exportar a PDF"
     >
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        width="18" 
-        height="18" 
-        viewBox="0 0 24 24" 
-        fill="none" 
-        stroke="currentColor" 
-        strokeWidth="2" 
-        strokeLinecap="round" 
-        strokeLinejoin="round"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-        <polyline points="14 2 14 8 20 8"></polyline>
-        <path d="M9 15L12 12 15 15"></path>
-        <path d="M12 12L12 19"></path>
-      </svg>
-      <span>Exportar PDF</span>
+      Exportar PDF
     </button>
   );
 };

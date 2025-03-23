@@ -60,15 +60,19 @@ export const calcularRubrosYTotales = (items) => {
   
   // 2. Agrupar ítems por rubro
   const rubroMap = {};
-  
+
   items.forEach(item => {
     const rubroId = item.rubroId || 'ST000';
     
     if (!rubroMap[rubroId]) {
+      // Extraer el número de rubro del ID o del índice
+      const rubroNumero = rubroId.replace('ST', '').replace(/^0+/, '') || 
+                          (item.indice ? item.indice.split('.')[0] : '0');
+      
       rubroMap[rubroId] = {
         id: rubroId,
-        nombre: item.rubroNombre || 'Sin categoría',
-        indice: (rubroId.replace('ST', '').replace(/^0+/, '') || '0') + '.0.0',
+        nombre: 'Sin categoría', // Esto se reemplazará al renderizar con la categoría real
+        indice: `${rubroNumero}.0.0`,
         items: [],
         importe: 0,
         incidencia: 0
@@ -136,7 +140,6 @@ export const prepararDatosFirestore = (formData, items) => {
   
   items.forEach(item => {
     const itemId = item.id;
-    const rubroNumero = (item.rubroId || 'ST000').replace('ST', '').replace(/^0+/, '');
     
     itemsFirestore[itemId] = {
       analisis_id: item.analisisId || '',
@@ -146,7 +149,7 @@ export const prepararDatosFirestore = (formData, items) => {
       precio_unitario: item.precioUnitario || 0,
       importe: item.importe || 0,
       incidencia: item.incidencia || 0,
-      numero_item: item.indice || `${rubroNumero}.0.0`,
+      numero_item: item.indice || '',  // Guardar el índice del presupuesto
       abrev: item.abrev || ''
     };
   });
@@ -186,3 +189,4 @@ export const prepararDatosFirestore = (formData, items) => {
     total_general: totalGeneral
   };
 };
+

@@ -1,0 +1,56 @@
+flowchart TD
+    subgraph "Firebase Firestore"
+        direction TB
+        DB_materials[("Collection: items")]
+        DB_analysis[("Collection: analisis")]
+        DB_budget[("Collection: presupuestos")]
+    end
+    
+    subgraph "Gestión de Precios"
+        PM[PriceManagement.tsx]
+        loadMaterials[Cargar Materiales]
+        editMaterial[Editar Material]
+        createMaterial[Crear Material]
+        deleteMaterial[Eliminar Material]
+    end
+    
+    subgraph "Análisis de Costos"
+        CA[CostAnalysis.tsx]
+        loadAnalysis[Cargar Análisis]
+        createAnalysis[Crear Análisis]
+        editAnalysis[Editar Análisis]
+        addItemToAnalysis[Añadir Material a Análisis]
+    end
+    
+    subgraph "Presupuestos"
+        BP[PresupuestoEditor.tsx]
+        loadBudgets[Cargar Presupuestos]
+        createBudget[Crear Presupuesto]
+        addAnalysisToBudget[Añadir Análisis a Presupuesto]
+        calculateTotal[Calcular Totales]
+        exportPDF[Exportar a PDF]
+    end
+
+    %% Flujo de datos entre módulos y Firebase
+    DB_materials <--> loadMaterials
+    loadMaterials --> PM
+    PM --> editMaterial & createMaterial & deleteMaterial
+    editMaterial & createMaterial & deleteMaterial --> DB_materials
+    
+    DB_materials --> loadAnalysis
+    DB_analysis <--> loadAnalysis
+    loadAnalysis --> CA
+    CA --> createAnalysis & editAnalysis & addItemToAnalysis
+    createAnalysis & editAnalysis & addItemToAnalysis --> DB_analysis
+    
+    DB_analysis --> loadBudgets
+    DB_budget <--> loadBudgets
+    loadBudgets --> BP
+    BP --> createBudget & addAnalysisToBudget & calculateTotal
+    createBudget & addAnalysisToBudget & calculateTotal --> DB_budget
+    
+    BP --> exportPDF
+    
+    %% Conexiones cruzadas entre módulos
+    loadMaterials --> addItemToAnalysis
+    loadAnalysis --> addAnalysisToBudget

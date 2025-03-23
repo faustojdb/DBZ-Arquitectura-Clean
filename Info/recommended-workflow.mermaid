@@ -1,0 +1,29 @@
+graph TD
+    Start([Comenzar]) --> SetupFirebase[Crear Proyecto en Firebase]
+    SetupFirebase --> CloneRepo[Clonar Repositorio]
+    CloneRepo --> InstallDeps[Instalar Dependencias]
+    
+    InstallDeps --> UpdateFirebaseConfig[Actualizar Configuración de Firebase]
+    UpdateFirebaseConfig --> CreateDB[Crear Base de Datos en Firestore]
+    
+    CreateDB --> RunInit[Ejecutar Script de Inicialización]
+    RunInit --> DevServer[Iniciar Servidor de Desarrollo]
+    
+    subgraph "Personalización"
+        DevServer --> CustomizeCategories[Personalizar Categorías]
+        CustomizeCategories --> AddRealMaterials[Agregar Materiales Reales]
+        AddRealMaterials --> CreateAnalyses[Crear Análisis]
+        CreateAnalyses --> CreateBudgets[Crear Presupuestos]
+    end
+    
+    CreateBudgets --> BuildProd[Construir para Producción]
+    BuildProd --> DeployFirebase[Desplegar en Firebase Hosting]
+    
+    DeployFirebase --> UpdateSecurityRules[Actualizar Reglas de Seguridad]
+    UpdateSecurityRules --> ConfigDomain[Configurar Dominio Personalizado]
+    ConfigDomain --> End([Fin])
+    
+    style Start fill:#9CF,stroke:#333,stroke-width:2px
+    style End fill:#9CF,stroke:#333,stroke-width:2px
+    style DevServer fill:#FFC,stroke:#333,stroke-width:2px
+    style UpdateSecurityRules fill:#FDC,stroke:#333,stroke-width:2px

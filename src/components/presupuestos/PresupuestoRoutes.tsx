@@ -2,7 +2,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Importar componentes (estarán vacíos inicialmente)
+// Importar componentes
 import PresupuestoList from './PresupuestoList';
 import PresupuestoEditor from './PresupuestoEditor';
 import PresupuestoViewer from './PresupuestoViewer';

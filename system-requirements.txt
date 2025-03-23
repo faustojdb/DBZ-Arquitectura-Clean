@@ -1,0 +1,25 @@
+# Requisitos del sistema para instalar el proyecto
+# Instalar estas herramientas antes de configurar el proyecto
+
+# Herramientas esenciales
+git               # Sistema de control de versiones
+nodejs >= 14.0.0  # Entorno de ejecución JavaScript
+npm >= 6.0.0      # Gestor de paquetes de Node.js (o yarn)
+
+# Comandos de instalación para distribuciones basadas en Debian/Ubuntu:
+# sudo apt update
+# sudo apt install git
+# sudo apt install nodejs npm
+
+# Comandos de instalación para distribuciones Fedora/RHEL/CentOS:
+# sudo dnf install git
+# sudo dnf install nodejs
+
+# Comandos de instalación para distribuciones Arch Linux:
+# sudo pacman -S git
+# sudo pacman -S nodejs npm
+
+# Una vez instaladas estas herramientas, puedes instalar las dependencias del proyecto con:
+# cd <directorio-del-proyecto>
+# npm install
+# npm start (o el comando definido en package.json para iniciar)

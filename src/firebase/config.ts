@@ -1,28 +1,22 @@
-// src/firebase/config.ts
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth'; // Aseguramos importar getAuth
+// Archivo: src/firebase/config.ts
 
-// Usar la misma configuración que ya tienes en tu proyecto
-// Reemplaza estos valores con tu configuración actual
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
+// IMPORTANTE: Reemplazar esta configuración con tus propias credenciales de Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyBweR6uGVv46oFvgEOPONaUxVIFB8exJsI",
-  authDomain: "bns-whatsapp-bo.firebaseapp.com",
-  databaseURL: "https://bns-whatsapp-bo-default-rtdb.firebaseio.com",
-  projectId: "bns-whatsapp-bo",
-  storageBucket: "bns-whatsapp-bo.firebasestorage.app",
-  messagingSenderId: "885329022100",
-  appId: "1:885329022100:web:5d4b501f91c91b0f457881"
+  apiKey: "TU_API_KEY",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  projectId: "tu-proyecto",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "TU_MESSAGING_SENDER_ID",
+  appId: "TU_APP_ID"
 };
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
-// Obtener instancia de Firestore
-const db = getFirestore(app);
+// Inicializar y exportar Firestore
+export const db = getFirestore(app);
 
-// Obtener instancia de Auth
-const auth = getAuth(app);
-
-export { db, auth };
 export default db;
